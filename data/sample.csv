@@ -1,0 +1,17 @@
+// haikus.csv
+line_type,text,mood,season
+first,"Silent bamboo grove",nature,summer
+first,"Autumn leaves falling",nature,fall
+first,"Winter moon rises",nature,winter
+first,"Spring rain softly falls",nature,spring
+first,"Gentle morning breeze",nature,spring
+middle,"Through the misty air",atmosphere,any
+middle,"Whispers in the dark",mysterious,any
+middle,"Memories drift by",contemplative,any
+middle,"Time stands still today",contemplative,any
+middle,"Dancing butterflies",nature,summer
+last,"Ancient wisdom speaks",contemplative,any
+last,"Dreams fade with the dawn",mysterious,any
+last,"Peace fills empty space",contemplative,any
+last,"Nature's lullaby",nature,any
+last,"Stars guide us back home",nature,night
