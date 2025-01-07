@@ -1,0 +1,11 @@
+sentence_id,location_descriptor,location,character_descriptor,character,action_descriptor,action,goal_descriptor,goal,color
+1,"in a bustling","coffee shop","a meticulous","barista","carefully","discovers","an ancient","recipe written in coffee stains",#2196F3
+2,"in an abandoned","subway station","a determined","street artist","boldly","creates","a glowing","mural that changes with the moonlight",#9C27B0
+3,"in a weathered","bookstore","an eccentric","librarian","methodically","uncovers","a forgotten","map to underground libraries",#4CAF50
+4,"in a neon-lit","food market","an ambitious","chef","enthusiastically","invents","a legendary","dish that grants wishes",#FF4081
+5,"in a spacious","rooftop greenhouse","a visionary","botanist","patiently","cultivates","an impossible","plant that sings at sunrise",#FF5722
+6,"in a dimly-lit","record store","a nostalgic","musician","reverently","finds","a mysterious","vinyl that plays forgotten dreams",#795548
+7,"in a hidden","secret garden","a mysterious","historian","diligently","decodes","an ancient","message in the flower patterns",#607D8B
+8,"in a mystical","lantern-lit alleyway","an intuitive","fortune teller","solemnly","reveals","a hidden","path through time",#00BCD4
+9,"in a vibrant","floating market","a resourceful","merchant","skillfully","trades","an enchanted","collection of bottled memories",#E91E63
+10,"in a timeless","clockmaker's workshop","a patient","watchmaker","precisely","crafts","a peculiar","timepiece that captures moments",#9E9E9E
