@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
+import axios from "axios";
 import {
   Box,
   Typography,
@@ -6,30 +7,16 @@ import {
   Button,
   Chip,
   Container,
-  Tooltip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
+  TextField,
+  CircularProgress,
+  LinearProgress,
 } from "@mui/material";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ShuffleRounded,
-  Psychology,
-  Close as CloseIcon,
-  Refresh,
-  AutoAwesome,
-} from "@mui/icons-material";
+import { ShuffleRounded, Refresh } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
-import { loadStoryElements } from "../utils/dataloader";
-import StoryFlowViz from "./storyFlowViz";
-import {
-  calculateCoherence,
-  calculateCreativity,
-  generateSmartSuggestions,
-} from "../utils/storyAnalysis";
 
-// Elegant and minimal scrollbar styling
+import StoryFlowViz from "./storyFlowViz";
+
 const ScrollContainer = styled(Box)(({ theme }) => ({
   overflowX: "auto",
   overflowY: "hidden",
@@ -50,204 +37,189 @@ const ScrollContainer = styled(Box)(({ theme }) => ({
   scrollBehavior: "smooth",
 }));
 
-// Styled component for sentence elements with a sleek design
-const SentenceElement = styled(Paper)(({ color, isSelected, theme }) => ({
+const StoryContainer = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  marginBottom: theme.spacing(4),
+  borderRadius: 16,
+  backgroundColor: "#ffffff",
+  boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.05)",
+  position: "relative",
+  overflow: "hidden",
+}));
+
+const ScoreCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: 12,
+  backgroundColor: "#ffffff",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  minWidth: 150,
+  boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)",
+}));
+
+const SentenceElement = styled(Paper, {
+  shouldForwardProp: (prop) => prop !== "isSelected" && prop !== "color",
+})(({ color, isSelected, theme }) => ({
   display: "inline-flex",
   alignItems: "center",
-  padding: "6px 14px",
-  margin: "0 3px",
+  padding: "8px 16px",
+  margin: "0 4px",
   cursor: "pointer",
-  borderRadius: 8,
+  borderRadius: 12,
   minWidth: "fit-content",
-  border: `1px solid ${isSelected ? color : "#e0e0e0"}`,
+  border: `1px solid ${isSelected ? color : "transparent"}`,
   backgroundColor: isSelected ? `${color}10` : "#fafafa",
-  boxShadow: isSelected ? `0 2px 8px ${color}20` : theme.shadows[1],
-  transition: "all 0.3s ease",
+  boxShadow: isSelected ? `0 2px 12px ${color}20` : "none",
+  transition: "all 0.2s ease",
   "&:hover": {
     backgroundColor: `${color}05`,
-    transform: "translateY(-1px)",
-    boxShadow: `0 4px 12px ${color}15`,
+    transform: "translateY(-2px)",
+    boxShadow: `0 4px 15px ${color}15`,
   },
 }));
 
-// Styled Chip for element types
 const ElementType = styled(Chip)({
-  marginLeft: 6,
-  fontSize: "0.6rem",
-  height: 18,
+  marginLeft: 8,
+  fontSize: "0.65rem",
+  height: 20,
+  borderRadius: 10,
+  fontWeight: 500,
   transition: "all 0.2s ease",
 });
 
-// Insight card with a clean look
-const InsightCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-  borderRadius: 10,
-  backgroundColor: "#ffffff",
-  boxShadow: theme.shadows[1],
-  transition: "all 0.3s ease",
-  "&:hover": {
-    boxShadow: theme.shadows[3],
+const StyledLinearProgress = styled(LinearProgress)(({ theme }) => ({
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: "#e0e0e0",
+  "& .MuiLinearProgress-bar": {
+    borderRadius: 4,
   },
 }));
 
-// Score display container without background
-const ScoreDisplay = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: theme.spacing(3),
-}));
-
-// Function to determine score color based on value
-const getScoreColor = (value) => {
-  if (value >= 80) return "#2e7d32"; // Green
-  if (value >= 60) return "#ed6c02"; // Yellow-Orange
-  if (value >= 40) return "#f57c00"; // Orange
-  return "#d32f2f"; // Red
-};
-
-// Individual score item with dynamic color
-const ScoreItem = ({ label, value }) => {
-  const color = getScoreColor(value);
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        sx={{
-          color: "#555",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="h6"
-        sx={{
-          color,
-          fontWeight: 600,
-          lineHeight: 1.2,
-        }}
-      >
-        {value}%
-      </Typography>
-    </Box>
-  );
-};
-
-// Styled Suggestion Chip with subtle animations
-const SuggestionChip = styled(Chip)(({ theme }) => ({
-  backgroundColor: "#f0f0f0",
+const ActionButton = styled(Button)(({ theme }) => ({
+  borderRadius: 10,
+  textTransform: "none",
+  padding: "8px 24px",
+  fontWeight: 600,
+  boxShadow: "none",
   transition: "all 0.2s ease",
   "&:hover": {
-    backgroundColor: "#e0e0e0",
+    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
     transform: "translateY(-1px)",
   },
-  "&:active": {
-    transform: "translateY(0px)",
-  },
+}));
+
+const HistoryPanel = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  marginTop: theme.spacing(4),
+  borderRadius: 16,
+  backgroundColor: "#ffffff",
+  maxHeight: 400,
+  overflowY: "auto",
 }));
 
 export default function SentenceRecombinator() {
-  const nodeColors = {
-    location_descriptor: "#673ab7",
-    location: "#9c27b0",
-    character: "#4caf50",
-    character_descriptor: "#3f51b5",
-    action_descriptor: "#ff9800",
-    action: "#ffb74d",
-    goal_descriptor: "#e91e63",
-    goal: "#f44336",
-  };
-
   const [sentences, setSentences] = useState([]);
   const [selectedElements, setSelectedElements] = useState([]);
-  const [insights, setInsights] = useState([]);
-  const [showInsights, setShowInsights] = useState(false);
   const [coherenceScore, setCoherenceScore] = useState(0);
   const [creativityScore, setCreativityScore] = useState(0);
-  const [suggestions, setSuggestions] = useState([]);
-
+  const [storyTheme, setStoryTheme] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisHistory, setAnalysisHistory] = useState([]);
   const scrollRef = useRef(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      const data = await loadStoryElements();
-      setSentences(data);
-    };
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedElements.length > 0) {
-      const coherence = calculateCoherence(selectedElements);
-      const creativity = calculateCreativity(
-        selectedElements,
-        sentences.flatMap((s) => s.elements)
-      );
-
-      setCoherenceScore(coherence);
-      setCreativityScore(creativity);
-
-      const newInsights = [
-        {
-          type: coherence > 70 ? "strength" : "suggestion",
-          title: "Narrative Flow",
-          content:
-            coherence > 70
-              ? "Your story has a strong narrative progression."
-              : "Consider adjusting the element order for better flow.",
-        },
-        {
-          type: creativity > 70 ? "strength" : "suggestion",
-          title: "Creative Elements",
-          content:
-            creativity > 70
-              ? "Your combination shows high creativity."
-              : "Try adding more unique elements to stand out.",
-        },
-      ];
-
-      const newSuggestions = generateSmartSuggestions(
-        selectedElements,
-        sentences.flatMap((s) => s.elements)
-      );
-
-      setSuggestions(newSuggestions);
-      setInsights(newInsights);
-    } else {
-      setCoherenceScore(0);
-      setCreativityScore(0);
-      setSuggestions([]);
-      setInsights([]);
+  const handleGenerateStory = async () => {
+    if (!storyTheme.trim()) {
+      alert("Please enter a story theme");
+      return;
     }
-  }, [selectedElements, sentences]);
 
-  const handleElementClick = (element, color) => {
-    setSelectedElements((prev) => {
-      const elementIndex = prev.findIndex((el) => el.text === element.text);
-      if (elementIndex !== -1) {
-        return prev.filter((_, index) => index !== elementIndex);
-      }
-      return [...prev, { ...element, color }];
-    });
+    setIsGenerating(true);
+    setSelectedElements([]);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8001/api/generate-story",
+        { theme: storyTheme }
+      );
+
+      const rows = response.data.story.trim().split("\n");
+      const transformedSentences = rows
+        .map((row, index) => {
+          const parts = row
+            .split(";")
+            .map((part) => part.trim().replace(/^"(.+)"$/, "$1"));
+
+          if (parts.length !== 10) {
+            console.error(`Invalid row format: ${row}`);
+            return null;
+          }
+
+          return {
+            id: parts[0],
+            color: parts[9],
+            elements: [
+              { type: "location_descriptor", text: parts[1], article: "the" },
+              { type: "location", text: parts[2], article: "the" },
+              { type: "character_descriptor", text: parts[3], article: "a" },
+              { type: "character", text: parts[4], article: "a" },
+              { type: "action_descriptor", text: parts[5], article: "a" },
+              { type: "action", text: parts[6], article: "a" },
+              { type: "goal_descriptor", text: parts[7], article: "a" },
+              { type: "goal", text: parts[8], article: "a" },
+            ].filter((el) => el.text && el.text !== "null" && el.text !== ""),
+          };
+        })
+        .filter(Boolean);
+
+      setSentences(transformedSentences);
+    } catch (error) {
+      console.error("Error:", error);
+      alert(`Error generating story: ${error.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleShuffle = () => {
-    setSelectedElements([]);
-    const typeOrder = [
-      "location_descriptor",
-      "location",
-      "character_descriptor",
-      "character",
-      "action_descriptor",
-      "action",
-      "goal_descriptor",
-      "goal",
-    ];
+  const typeOrder = {
+    location_descriptor: 1,
+    location: 2,
+    character_descriptor: 3,
+    character: 4,
+    action_descriptor: 5,
+    action: 6,
+    goal_descriptor: 7,
+    goal: 8,
+  };
 
-    const newStory = typeOrder
+  const sortElementsByType = (elements) => {
+    return [...elements].sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+  };
+
+const handleElementClick = (element, color) => {
+  setSelectedElements((prev) => {
+    const elementIndex = prev.findIndex((el) => el.text === element.text);
+    if (elementIndex !== -1) {
+      const newElements = prev.filter((_, index) => index !== elementIndex);
+      setCoherenceScore(0);
+      setCreativityScore(0);
+      return sortElementsByType(newElements); // Sort when removing
+    }
+    const newElements = [...prev, { ...element, color }];
+    setCoherenceScore(0);
+    setCreativityScore(0);
+    return sortElementsByType(newElements); // Sort when adding
+  });
+};
+
+  const orderedTypes = Object.entries(typeOrder)
+    .sort(([, a], [, b]) => a - b)
+    .map(([type]) => type);
+
+  const handleShuffle = () => {
+    const newStory = orderedTypes
       .map((type) => {
         const possibleElements = sentences.flatMap((sentence) =>
           sentence.elements.filter((element) => element.type === type)
@@ -260,57 +232,34 @@ export default function SentenceRecombinator() {
           sentence.elements.includes(randomElement)
         );
 
-        if (!randomElement || !originalSentence) return null;
-        return { ...randomElement, color: originalSentence.color };
+        return randomElement && originalSentence
+          ? { ...randomElement, color: originalSentence.color }
+          : null;
       })
       .filter(Boolean);
 
-    setSelectedElements(newStory);
-  };
-
-  const handleSmartShuffle = () => {
-    // Ensure that Smart Shuffle generates a complete story by selecting one element per type
-    const requiredTypes = [
-      "location_descriptor",
-      "location",
-      "character_descriptor",
-      "character",
-      "action_descriptor",
-      "action",
-      "goal_descriptor",
-      "goal",
-    ];
-
-    const smartStory = requiredTypes.map((type) => {
-      const possibleElements = sentences.flatMap((sentence) =>
-        sentence.elements.filter((element) => element.type === type)
-      );
-      if (possibleElements.length === 0) return null;
-
-      const smartElement =
-        possibleElements[Math.floor(Math.random() * possibleElements.length)];
-      const originalSentence = sentences.find((sentence) =>
-        sentence.elements.includes(smartElement)
-      );
-
-      if (!smartElement || !originalSentence) return null;
-      return { ...smartElement, color: originalSentence.color };
-    }).filter(Boolean);
-
-    setSelectedElements(smartStory);
+    setSelectedElements(sortElementsByType(newStory));
+    setCoherenceScore(0);
+    setCreativityScore(0);
   };
 
   const handleReset = () => {
     setSelectedElements([]);
-    setInsights([]);
   };
 
+  React.useEffect(() => {
+    if (selectedElements.length === 0) {
+      setCoherenceScore(0);
+      setCreativityScore(0);
+    }
+  }, [selectedElements]);
+
   const constructSentence = (elements) => {
-    if (!elements || elements.length === 0) return "";
+    if (!elements?.length) return "";
 
     return (
       elements
-        .filter((element) => element && element.text) // Filter out elements without text
+        .filter((element) => element?.text)
         .sort((a, b) => {
           const typeOrder = {
             location_descriptor: 1,
@@ -322,164 +271,254 @@ export default function SentenceRecombinator() {
             goal_descriptor: 7,
             goal: 8,
           };
-          // Assign a high value if type is not found to push it to the end
-          const aOrder = typeOrder[a.type] || 99;
-          const bOrder = typeOrder[b.type] || 99;
-          return aOrder - bOrder;
+          return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
         })
-        .map((element, index) => {
-          if (!element.text) return ""; // Additional safety check
-
-          const text = element.article
-            ? `${element.article} ${element.text}`
-            : element.text;
-
-          return index === 0
-            ? text.charAt(0).toUpperCase() + text.slice(1)
-            : text;
-        })
-        .filter(Boolean) // Remove any empty strings
+        .map((element) => element.text)
+        .filter(Boolean)
         .join(" ") + "."
     );
   };
 
+  const analyzeStory = async () => {
+    if (!selectedElements.length) {
+      alert("Please create a story first");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    const story = constructSentence(selectedElements);
+
+    try {
+      // Make both requests in parallel
+      const [coherenceResponse, creativityResponse] = await Promise.all([
+        axios.post("http://localhost:8001/api/analyze-story", {
+          story,
+          analysis_type: "coherence",
+        }),
+        axios.post("http://localhost:8001/api/analyze-story", {
+          story,
+          analysis_type: "creativity",
+        }),
+      ]);
+
+      setCoherenceScore(coherenceResponse.data.score);
+      setCreativityScore(creativityResponse.data.score);
+
+      // Add to history with both scores
+      setAnalysisHistory((prev) => [
+        ...prev,
+        {
+          timestamp: new Date(),
+          story,
+          coherenceScore: coherenceResponse.data.score,
+          creativityScore: creativityResponse.data.score,
+        },
+      ]);
+    } catch (error) {
+      console.error("Error analyzing story:", error);
+      alert(`Error analyzing story: ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Typography
-        variant="h2"
+      <Typography 
+                variant="h2" 
+                sx={{ 
+                  textAlign: "center", 
+                  mb: 4,
+                  fontSize: { xs: "1rem", sm: "2rem" },
+                }}
+              >
+                Story Premise Generator
+              </Typography>
+
+      <Box
         sx={{
-          textAlign: "center",
+          display: "flex",
+          gap: 2,
           mb: 4,
-          fontWeight: 700,
-          fontFamily: "'Merriweather', serif",
-          color: "#333",
+          justifyContent: "center",
+          flexDirection: { xs: "column", sm: "row" },
         }}
       >
-        Story Recombinator
-      </Typography>
-
-      <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 4 }}>
-        <Button
-          variant="text"
-          startIcon={<ShuffleRounded />}
-          onClick={handleShuffle}
-          sx={{
-            px: 3,
-            py: 1,
-            color: "#555",
-            borderRadius: 2,
-            textTransform: "none",
-            "&:hover": {
-              backgroundColor: "#f5f5f5",
-            },
-          }}
-        >
-          Random Shuffle
-        </Button>
-
-        <Button
-          variant="text"
-          startIcon={<AutoAwesome />}
-          onClick={handleSmartShuffle}
-          sx={{
-            px: 3,
-            py: 1,
-            color: "#555",
-            borderRadius: 2,
-            textTransform: "none",
-            "&:hover": {
-              backgroundColor: "#f5f5f5",
-            },
-          }}
-        >
-          Smart Shuffle
-        </Button>
-
-        <Button
+        <TextField
+          fullWidth
           variant="outlined"
-          startIcon={<Refresh />}
-          onClick={handleReset}
+          label="Story Theme"
+          value={storyTheme}
+          onChange={(e) => setStoryTheme(e.target.value)}
+          placeholder="Enter a story theme (e.g., 'time travel adventure')"
+          disabled={isGenerating}
           sx={{
-            px: 3,
-            py: 1,
-            borderColor: "#555",
-            color: "#555",
-            borderRadius: 2,
-            textTransform: "none",
+            maxWidth: { sm: 600 },
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2,
+              backgroundColor: "white",
+            },
+          }}
+        />
+        <ActionButton
+          variant="contained"
+          onClick={handleGenerateStory}
+          disabled={!storyTheme || isGenerating}
+          sx={{
+            minWidth: 150,
+            height: 56,
+            backgroundColor: isGenerating ? "#e0e0e0" : "#3498DB",
             "&:hover": {
-              borderColor: "#333",
-              backgroundColor: "#f5f5f5",
+              backgroundColor: "#2980B9",
             },
           }}
         >
-          Reset
-        </Button>
+          {isGenerating ? <CircularProgress size={24} /> : "Generate Story"}
+        </ActionButton>
       </Box>
 
-      <Paper
-        elevation={2}
-        sx={{
-          p: 4,
-          mb: 4,
-          borderRadius: 2,
-          backgroundColor: "#ffffff",
-          boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.05)",
-        }}
-      >
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: "#444" }}>
-            Your Story
-          </Typography>
+      <StoryContainer>
+        <Box
+          sx={{
+            mb: 3,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Box sx={{ display: "flex", gap: 2 }}>
-            {selectedElements.length > 0 && (
-              <ScoreDisplay>
-                <ScoreItem
-                  label="Coherence"
-                  value={Math.round(coherenceScore)}
+            <ActionButton
+              variant="outlined"
+              startIcon={<ShuffleRounded />}
+              onClick={handleShuffle}
+              disabled={sentences.length === 0}
+              sx={{ borderColor: "#3498DB", color: "#3498DB" }}
+            >
+              Shuffle
+            </ActionButton>
+            <ActionButton
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={handleReset}
+              disabled={selectedElements.length === 0}
+              sx={{ borderColor: "#E74C3C", color: "#E74C3C" }}
+            >
+              Reset
+            </ActionButton>
+          </Box>
+
+          {selectedElements.length > 0 && (
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <ScoreCard>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  Coherence
+                </Typography>
+                <StyledLinearProgress
+                  variant="determinate"
+                  value={coherenceScore}
+                  sx={{
+                    width: "100%",
+                    mb: 1,
+                    "& .MuiLinearProgress-bar": {
+                      backgroundColor: "#27AE60",
+                    },
+                  }}
                 />
-                <ScoreItem
-                  label="Creativity"
-                  value={Math.round(creativityScore)}
+                <Typography variant="h6" color="#27AE60">
+                  {Math.round(coherenceScore)}%
+                </Typography>
+              </ScoreCard>
+              <ScoreCard>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  Creativity
+                </Typography>
+                <StyledLinearProgress
+                  variant="determinate"
+                  value={creativityScore}
+                  sx={{
+                    width: "100%",
+                    mb: 1,
+                    "& .MuiLinearProgress-bar": {
+                      backgroundColor: "#9B59B6",
+                    },
+                  }}
                 />
-              </ScoreDisplay>
-            )}
-            <Tooltip title="View Insights">
-              <IconButton
-                onClick={() => setShowInsights(true)}
-                disabled={selectedElements.length === 0}
+                <Typography variant="h6" color="#9B59B6">
+                  {Math.round(creativityScore)}%
+                </Typography>
+              </ScoreCard>
+              <ActionButton
+                variant="contained"
+                onClick={analyzeStory}
+                disabled={isAnalyzing}
                 sx={{
-                  color: selectedElements.length > 0 ? "#555" : "grey.400",
-                  transition: "color 0.3s",
+                  height: "auto",
+                  backgroundColor: "#2C3E50",
                   "&:hover": {
-                    color: "#333",
+                    backgroundColor: "#34495E",
                   },
                 }}
               >
-                <Psychology />
-              </IconButton>
-            </Tooltip>
-          </Box>
+                {isAnalyzing ? <CircularProgress size={24} /> : "Analyze Story"}
+              </ActionButton>
+            </Box>
+          )}
         </Box>
 
         <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box
+              sx={{
+                minHeight: 100,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                mb: 4,
+              }}
+            >
               {selectedElements.length === 0 ? (
-                <Typography color="text.secondary" sx={{ fontStyle: "italic" }}>
-                  Select elements from below or use shuffle to create your story
+                <Typography
+                  color="text.secondary"
+                  sx={{
+                    fontStyle: "italic",
+                    textAlign: "center",
+                    py: 4,
+                  }}
+                >
+                  {sentences.length > 0
+                    ? "Select elements from below or use shuffle to create your story"
+                    : "Generate a story to get started"}
                 </Typography>
               ) : (
-                <>
-                  <Typography variant="h6" sx={{ fontWeight: 500, color: "#333" }}>
-                    {constructSentence(
-                      selectedElements.filter(
-                        (element) => element && element.text
-                      )
-                    )}
+                <Box
+                  sx={{
+                    backgroundColor: "#f8f9fa",
+                    borderRadius: 2,
+                    p: 3,
+                  }}
+                >
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 500,
+                      color: "#2C3E50",
+                      mb: 2,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {constructSentence(selectedElements)}
                   </Typography>
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                     {selectedElements.map((element, index) => (
@@ -495,92 +534,88 @@ export default function SentenceRecombinator() {
                           },
                           borderRadius: "12px",
                           fontWeight: 500,
-                          color: "#333",
+                          color: "#2C3E50",
                         }}
                       />
                     ))}
                   </Box>
-                </>
+                </Box>
               )}
             </Box>
           </motion.div>
         </AnimatePresence>
 
         {selectedElements.length > 0 && (
-          <StoryFlowViz
-            elements={selectedElements}
-            coherenceScore={coherenceScore}
-            creativityScore={creativityScore}
-          />
-        )}
-
-        {suggestions.length > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Typography
-              variant="subtitle2"
-              color="text.secondary"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                mb: 2,
-              }}
-            >
-              <AutoAwesome sx={{ fontSize: 20, color: "#555" }} />
-              Recommended Next Elements
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1.5,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              {suggestions.map((suggestion, index) => {
-                // Debugging: Log suggestion details
-                console.log("Suggestion:", suggestion);
-
-                // Determine element type and color
-                const elementType = suggestion?.type || "unknown";
-                const typeColor = nodeColors[elementType] || "#999";
-
-                return (
-                  <Tooltip
-                    key={index}
-                    title={`${elementType.replace(
-                      /_/g,
-                      " "
-                    )} - improves story coherence`}
-                    arrow
-                  >
-                    <SuggestionChip
-                      label={suggestion.text || "Suggestion"}
-                      onClick={() => handleElementClick(suggestion)}
-                      sx={{
-                        backgroundColor: `${typeColor}10`,
-                        border: `1px solid ${typeColor}30`,
-                        "&:hover": {
-                          backgroundColor: `${typeColor}15`,
-                        },
-                        transition: "all 0.2s ease",
-                      }}
-                      icon={
-                        <AutoAwesome sx={{ fontSize: 16, color: typeColor }} />
-                      }
-                    />
-                  </Tooltip>
-                );
-              })}
-            </Box>
+          <Box sx={{ height: 200, mb: 4 }}>
+            <StoryFlowViz
+              elements={selectedElements}
+              coherenceScore={coherenceScore}
+              creativityScore={creativityScore}
+            />
           </Box>
         )}
-      </Paper>
+      </StoryContainer>
+      <HistoryPanel>
+        <Typography variant="h6" sx={{ mb: 3 }}>
+          Analysis History
+        </Typography>
+        {analysisHistory.length === 0 ? (
+          <Typography color="text.secondary" sx={{ fontStyle: "italic" }}>
+            No analysis history yet
+          </Typography>
+        ) : (
+          analysisHistory.map((entry, index) => (
+            <Box
+              key={index}
+              sx={{
+                mb: 2,
+                pb: 2,
+                borderBottom:
+                  index !== analysisHistory.length - 1
+                    ? "1px solid #eee"
+                    : "none",
+              }}
+            >
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {entry.timestamp.toLocaleString()}
+              </Typography>
+              <Typography variant="body1" sx={{ mb: 1 }}>
+                {entry.story}
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Chip
+                  label={`Coherence: ${entry.coherenceScore}%`}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#27AE6010",
+                    color: "#27AE60",
+                    fontWeight: 500,
+                  }}
+                />
+                <Chip
+                  label={`Creativity: ${entry.creativityScore}%`}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#9B59B610",
+                    color: "#9B59B6",
+                    fontWeight: 500,
+                  }}
+                />
+              </Box>
+            </Box>
+          ))
+        )}
+      </HistoryPanel>
 
       <ScrollContainer ref={scrollRef}>
-        <Box sx={{ position: "relative", my: 6 }}>
+        <Box sx={{ position: "relative", mb: 6 }}>
           {sentences.map((sentence, index) => (
-            <motion.div key={index}>
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
               <Box
                 sx={{
                   display: "flex",
@@ -592,10 +627,7 @@ export default function SentenceRecombinator() {
                 }}
               >
                 {sentence.elements
-                  .filter(
-                    (element) =>
-                      element && element.text && element.text.trim() !== ""
-                  )
+                  .filter((element) => element?.text?.trim())
                   .map((element, elementIndex) => (
                     <SentenceElement
                       key={`${element.text}-${elementIndex}`}
@@ -607,14 +639,20 @@ export default function SentenceRecombinator() {
                         handleElementClick(element, sentence.color)
                       }
                       component={motion.div}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: "#444" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 500,
+                          color: "#2C3E50",
+                        }}
+                      >
                         {element.text}
                       </Typography>
                       <ElementType
-                        label={element.type}
+                        label={element.type.replace(/_/g, " ")}
                         size="small"
                         sx={{
                           backgroundColor: sentence.color,
@@ -628,35 +666,6 @@ export default function SentenceRecombinator() {
           ))}
         </Box>
       </ScrollContainer>
-
-      <Dialog
-        open={showInsights}
-        onClose={() => setShowInsights(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ position: "relative", fontFamily: "'Merriweather', serif", color: "#333" }}>
-          Story Insights
-          <IconButton
-            onClick={() => setShowInsights(false)}
-            sx={{ position: "absolute", right: 8, top: 8, color: "#555" }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          {insights.map((insight, index) => (
-            <InsightCard key={index}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, color: "#333" }}>
-                {insight.title}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {insight.content}
-              </Typography>
-            </InsightCard>
-          ))}
-        </DialogContent>
-      </Dialog>
     </Container>
   );
 }

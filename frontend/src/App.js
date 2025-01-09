@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import HaikuMixer from './components/HaikuMixer';
 import SentenceRecombinator from './components/SentenceRecombinator';
+import StoryCircleGenerator from './components/StoryCircleGenerator';
 
 const theme = createTheme({
   palette: {
@@ -68,36 +69,37 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Container maxWidth={false}>
-        <Paper 
-          elevation={0} 
-          sx={{ 
+        <Paper
+          elevation={0}
+          sx={{
             borderRadius: 0,
-            minHeight: '100vh',
-            backgroundColor: '#fafafa'
+            minHeight: "100vh",
+            backgroundColor: "#fafafa",
           }}
         >
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: '#fff' }}>
+          <Box
+            sx={{
+              borderBottom: 1,
+              borderColor: "divider",
+              backgroundColor: "#fff",
+            }}
+          >
             <Container maxWidth="xl">
-              <Tabs 
-                value={tabValue} 
-                onChange={handleTabChange} 
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
                 aria-label="creative mixer tabs"
                 sx={{
-                  '& .MuiTab-root': {
-                    fontSize: '1rem',
-                    textTransform: 'none',
+                  "& .MuiTab-root": {
+                    fontSize: "1rem",
+                    textTransform: "none",
                     py: 2,
                   },
                 }}
               >
-                <Tab 
-                  label="Haiku Mixer" 
-                  {...a11yProps(0)} 
-                />
-                <Tab 
-                  label="Story Recombinator" 
-                  {...a11yProps(1)} 
-                />
+                <Tab label="Haiku Mixer" {...a11yProps(0)} />
+                <Tab label="Story Recombinator" {...a11yProps(1)} />
+                <Tab label="Story Circle Generator" {...a11yProps(2)} />
               </Tabs>
             </Container>
           </Box>
@@ -107,6 +109,9 @@ function App() {
           </TabPanel>
           <TabPanel value={tabValue} index={1}>
             <SentenceRecombinator />
+          </TabPanel>
+          <TabPanel value={tabValue} index={2}>
+            <StoryCircleGenerator />
           </TabPanel>
         </Paper>
       </Container>

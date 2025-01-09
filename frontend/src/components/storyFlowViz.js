@@ -1,47 +1,65 @@
-// StoryFlowViz.jsx
-import React from 'react';
-import { Box, Paper, Typography } from '@mui/material';
-import { motion } from 'framer-motion';
+import React from "react";
+import { Box, Paper, Typography } from "@mui/material";
+import { motion } from "framer-motion";
+
+const typeOrder = {
+  location_descriptor: 1,
+  location: 2,
+  character_descriptor: 3,
+  character: 4,
+  action_descriptor: 5,
+  action: 6,
+  goal_descriptor: 7,
+  goal: 8,
+};
+
+const sortElementsByType = (elements) => {
+  return [...elements].sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+};
+
+const nodeColors = {
+  location_descriptor: "#2196f3",
+  location: "#4caf50",
+  character_descriptor: "#ff9800",
+  character: "#f44336",
+  action_descriptor: "#9c27b0",
+  action: "#3f51b5",
+  goal_descriptor: "#e91e63",
+  goal: "#795548",
+};
 
 const StoryFlowViz = ({ elements, coherenceScore, creativityScore }) => {
-  const nodeColors = {
-    opening: '#2196f3',
-    character: '#4caf50',
-    action: '#ff9800',
-    goal: '#f44336',
-    location: '#9c27b0',
-    character_descriptor: '#3f51b5',
-    goal_descriptor: '#e91e63',
-    descriptor: '#607d8b',
-    subject: '#795548'
-  };
-
-  // Filter out invalid elements
-  const validElements = elements.filter(element => element && element.type && element.text);
+  const validElements = elements.filter(
+    (element) => element && element.type && element.text
+  );
+  const sortedElements = sortElementsByType(validElements);
 
   return (
-    <Paper 
+    <Paper
       elevation={2}
-      sx={{ 
-        p: 3, 
-        my: 3, 
-        background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)'
+      sx={{
+        p: 3,
+        my: 3,
+        background: "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
       }}
     >
-      <Typography variant="h6" gutterBottom>Story Flow</Typography>
-      
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        position: 'relative',
-        overflowX: 'auto',
-        pb: 2
-      }}>
-        {validElements.map((element, index) => {
-          // Add safety checks
-          const elementType = element?.type || 'unknown';
-          const elementText = element?.text || '';
-          const typeColor = nodeColors[elementType] || '#999';
+      <Typography variant="h6" gutterBottom>
+        Story Flow
+      </Typography>
+
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          position: "relative",
+          overflowX: "auto",
+          pb: 2,
+        }}
+      >
+        {sortedElements.map((element, index) => {
+          const elementType = element?.type || "unknown";
+          const elementText = element?.text || "";
+          const typeColor = nodeColors[elementType] || "#999";
 
           return (
             <React.Fragment key={index}>
@@ -52,8 +70,8 @@ const StoryFlowViz = ({ elements, coherenceScore, creativityScore }) => {
                   style={{
                     height: 2,
                     width: 50,
-                    backgroundColor: '#ccc',
-                    margin: '0 10px'
+                    backgroundColor: "#ccc",
+                    margin: "0 10px",
                   }}
                 />
               )}
@@ -68,11 +86,11 @@ const StoryFlowViz = ({ elements, coherenceScore, creativityScore }) => {
                     p: 2,
                     borderLeft: `4px solid ${typeColor}`,
                     minWidth: 120,
-                    backgroundColor: `${typeColor}10`
+                    backgroundColor: `${typeColor}10`,
                   }}
                 >
                   <Typography variant="caption" color="text.secondary">
-                    {elementType.replace(/_/g, ' ')}
+                    {elementType.replace(/_/g, " ")}
                   </Typography>
                   <Typography variant="body2" noWrap>
                     {elementText}
