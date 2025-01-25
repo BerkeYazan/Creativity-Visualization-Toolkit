@@ -1,3 +1,4 @@
+# backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import nltk
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Download NLTK data
 try:
     nltk.download('punkt', quiet=True)
 except:
@@ -13,21 +15,20 @@ except:
 
 app = FastAPI()
 
+# Updated CORS for port 3001
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3001",
-        "http://127.0.0.1:3001"
-    ],
+    allow_origins=["http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Update this import to use relative import
-from .routes.text_processing import router as text_processing_router
+# Include routers
+from .routes import story_routes, text_processing
 
-app.include_router(text_processing_router, prefix="/api")
+app.include_router(story_routes.router, prefix="/api")
+app.include_router(text_processing.router, prefix="/api")
 
 @app.get("/api/test")
 async def test():

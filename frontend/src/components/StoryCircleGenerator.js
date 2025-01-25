@@ -1,186 +1,245 @@
-// StoryCircleGenerator.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Container,
   Box,
   Typography,
-  Paper,
-  Chip,
+  Button,
   CircularProgress,
+  TextField,
+  alpha,
 } from "@mui/material";
 import axios from "axios";
+import * as d3 from "d3";
 
-const STAGES = [
-  { id: "ordinary_world", name: "Ordinary World", color: "#1E88E5" },
-  { id: "call", name: "Call to Adventure", color: "#D81B60" },
-  { id: "refusal", name: "Refusal", color: "#43A047" },
-  { id: "mentor", name: "Meeting Mentor", color: "#6D4C41" },
-  { id: "threshold", name: "Crossing Threshold", color: "#5E35B1" },
-  { id: "tests", name: "Tests & Allies", color: "#E53935" },
-  { id: "approach", name: "Approaching Cave", color: "#FF8F00" },
-  { id: "ordeal", name: "Ordeal", color: "#558B2F" },
-  { id: "reward", name: "Reward", color: "#0097A7" },
-  { id: "road_back", name: "Road Back", color: "#8E24AA" },
-  { id: "resurrection", name: "Resurrection", color: "#EF6C00" },
-  { id: "return", name: "Return with Elixir", color: "#1565C0" },
-];
-
-// StoryCircleGenerator.jsx
-// ... (previous imports remain the same)
+const DNA_COLORS = ["#6C5B7B", "#C06C84", "#F67280", "#F8B195"];
+const HELIX_RADIUS = 120;
+const NODE_RADIUS = 8;
 
 export default function StoryCircleGenerator() {
-  const [theme, setTheme] = useState('');
+  const [theme, setTheme] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedStages, setSelectedStages] = useState([]);
-  const [storyElements, setStoryElements] = useState(null);
-  const [generatedStory, setGeneratedStory] = useState('');
-  const [error, setError] = useState('');
-    
-  const generateStory = async () => {
+  const [strands, setStrands] = useState([]);
+  const [selectedNodes, setSelectedNodes] = useState([]);
+  const svgRef = useRef(null);
+
+  const generateStoryDNA = async () => {
+    if (!theme.trim()) return;
+
     setLoading(true);
-    setError('');
-
     try {
-      const response = await axios.post('http://localhost:8001/api/generate-story', {
-        theme: theme.trim()
-      });
+      const { data } = await axios.post(
+        "http://localhost:8001/api/generate-story-circle",
+        {
+          theme: theme.trim(),
+          strands: 4,
+        },
+        {
+          timeout: 30000, // 30-second timeout
+        }
+      );
 
-      console.log('API Response:', response.data); // Debug log
-
-      if (response.data && response.data.stages) {
-        setStoryElements(response.data);
-        setSelectedStages([]);
-        setGeneratedStory('');
-      } else {
-        throw new Error('Invalid response format');
-      }
+      setStrands(data.map((strand) => strand.phases));
     } catch (error) {
-      console.error('Error generating story:', error);
-      setError(error.message || 'Error generating story elements');
+      console.error("Full error details:", error);
+
+      let errorMessage = "Failed to generate story DNA";
+      if (error.response) {
+        errorMessage = error.response.data.detail || errorMessage;
+        console.error("Server response:", error.response.data);
+
+        // Show detailed error for development
+        alert(`Error: ${errorMessage}\n\nCheck console for details`);
+      } else if (error.request) {
+        errorMessage = "No response from server";
+      }
+
+      setStrands([]);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleStage = (stageId) => {
-    setSelectedStages((prevSelectedStages) => {
-      if (prevSelectedStages.includes(stageId)) {
-        return prevSelectedStages.filter(id => id !== stageId);
-      } else {
-        return [...prevSelectedStages, stageId];
-      }
+  const renderDNA = useCallback(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+
+    const width = svgRef.current.parentElement.offsetWidth;
+    const height = 600;
+    svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+    strands.forEach((strand, i) => {
+      const helix = d3
+        .line()
+        .curve(d3.curveNatural)
+        .x((d) => d.x)
+        .y((d) => d.y);
+
+      const points = Array.from({ length: 12 }, (_, j) => ({
+        x: width / 2 + HELIX_RADIUS * Math.sin((j * Math.PI) / 2),
+        y: (height * (j + 1)) / 14 + (i % 2 ? HELIX_RADIUS : -HELIX_RADIUS),
+      }));
+
+      svg
+        .append("path")
+        .datum(points)
+        .attr("d", helix)
+        .attr("fill", "none")
+        .attr("stroke", alpha(DNA_COLORS[i % 4], 0.1))
+        .attr("stroke-width", 2);
+
+      points.forEach((point, j) => {
+        const node = svg
+          .append("g")
+          .attr("transform", `translate(${point.x},${point.y})`)
+          .datum({ strand: i, phase: j })
+          .on("click", handleNodeClick);
+
+        node
+          .append("circle")
+          .attr("r", NODE_RADIUS)
+          .attr("fill", DNA_COLORS[i % 4])
+          .attr("stroke", "white")
+          .attr("stroke-width", 2);
+
+        node
+          .on("mouseover", () => {
+            node
+              .select("circle")
+              .transition()
+              .attr("r", NODE_RADIUS * 1.5)
+              .attr("fill", alpha(DNA_COLORS[i % 4], 0.8));
+          })
+          .on("mouseout", () => {
+            node
+              .select("circle")
+              .transition()
+              .attr("r", NODE_RADIUS)
+              .attr("fill", DNA_COLORS[i % 4]);
+          });
+      });
+    });
+  }, [strands]);
+
+  useEffect(() => {
+    if (strands.length > 0) renderDNA();
+  }, [strands, renderDNA]);
+
+  const handleNodeClick = (event, { strand, phase }) => {
+    setSelectedNodes((prev) => {
+      const exists = prev.some((n) => n.strand === strand && n.phase === phase);
+      return exists
+        ? prev.filter((n) => !(n.strand === strand && n.phase === phase))
+        : [...prev, { strand, phase }];
     });
   };
 
-  const constructStageSentence = (stage, stageId) => {
-    const stageName = STAGES.find(s => s.id === stageId)?.name;
-    if (!stage || !stage.description) return '';
-    return `${stageName}:\n${stage.description}`;
+  const performCrossover = () => {
+    if (selectedNodes.length !== 2) return;
+
+    const [a, b] = selectedNodes;
+    setStrands((strands) => {
+      const newStrands = [...strands];
+      const temp = newStrands[a.strand][a.phase];
+      newStrands[a.strand][a.phase] = newStrands[b.strand][b.phase];
+      newStrands[b.strand][b.phase] = temp;
+      return newStrands;
+    });
+    setSelectedNodes([]);
   };
 
-  useEffect(() => {
-    if (selectedStages.length > 0 && storyElements?.stages) {
-      const story = selectedStages.map(stageId => {
-        const stage = storyElements.stages[stageId];
-        return stage ? constructStageSentence(stage, stageId) : '';
-      }).filter(Boolean).join('\n\n');
-      
-      setGeneratedStory(story);
-    } else {
-      setGeneratedStory('');
-    }
-  }, [selectedStages, storyElements]);
-
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      {/* ... (previous Typography and Box components remain the same) */}
-
-      {error && (
-        <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>
-          {error}
+    <Box
+      sx={{
+        maxWidth: 1200,
+        margin: "0 auto",
+        p: 4,
+        bgcolor: "background.default",
+        minHeight: "100vh",
+      }}
+    >
+      {/* Header */}
+      <Box sx={{ textAlign: "center", mb: 8 }}>
+        <Typography
+          variant="h1"
+          sx={{ fontWeight: 800, letterSpacing: "-0.05em", mb: 1 }}
+        >
+          Story DNA
         </Typography>
-      )}
+        <Typography
+          variant="body1"
+          sx={{ color: "text.secondary", maxWidth: 600, mx: "auto" }}
+        >
+          Evolve stories through genetic recombination
+        </Typography>
+      </Box>
 
-      <Box sx={{ display: 'flex', gap: 4 }}>
-        {/* Story Circle Visualization */}
-        <Paper sx={{ flex: 1, p: 3, height: 'fit-content' }}>
-          <Box sx={{ 
-            width: 500,
-            height: 500,
-            position: 'relative',
-            margin: 'auto'
-          }}>
-            {STAGES.map((stage, index) => {
-              const angle = ((index * 360) / STAGES.length) * (Math.PI / 180);
-              const radius = 200;
-              const x = 250 + radius * Math.cos(angle - Math.PI / 2);
-              const y = 250 + radius * Math.sin(angle - Math.PI / 2);
+      {/* Controls */}
+      <Box sx={{ display: "flex", gap: 2, mb: 8, "& > *": { flex: 1 } }}>
+        <TextField
+          fullWidth
+          variant="standard"
+          placeholder="Enter story seed..."
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          InputProps={{
+            disableUnderline: true,
+            sx: { fontSize: 24, fontWeight: 500, textAlign: "center" },
+          }}
+        />
+        <Button
+          variant="contained"
+          onClick={generateStoryDNA}
+          disabled={loading}
+          sx={{ height: 56, width: 200, borderRadius: 28, fontWeight: 700 }}
+        >
+          {loading ? <CircularProgress size={24} /> : "Generate"}
+        </Button>
+      </Box>
 
-              return (
-                <Box
-                  key={stage.id}
-                  sx={{
-                    position: 'absolute',
-                    left: x,
-                    top: y,
-                    transform: 'translate(-50%, -50%)',
-                    cursor: storyElements ? 'pointer' : 'default',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Chip
-                    label={stage.name}
-                    onClick={() => storyElements && toggleStage(stage.id)}
-                    sx={{
-                      backgroundColor: selectedStages.includes(stage.id) 
-                        ? stage.color 
-                        : '#e0e0e0',
-                      color: selectedStages.includes(stage.id) 
-                        ? 'white' 
-                        : 'black',
-                      opacity: storyElements ? 1 : 0.6,
-                      '&:hover': {
-                        backgroundColor: storyElements && selectedStages.includes(stage.id)
-                          ? stage.color
-                          : '#bdbdbd'
-                      }
-                    }}
-                  />
-                </Box>
-              );
-            })}
-          </Box>
-        </Paper>
+      {/* DNA Visualization */}
+      <Box
+        sx={{
+          position: "relative",
+          height: 600,
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
+      >
+        <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />
 
-        {/* Generated Story Display */}
-        <Paper sx={{ flex: 1, p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Generated Story Elements
-          </Typography>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : generatedStory ? (
-            <Typography 
-              variant="body1" 
-              component="pre" 
-              sx={{ 
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'inherit'
+        {/* Crossover Controls */}
+        {selectedNodes.length > 0 && (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 24,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              gap: 2,
+            }}
+          >
+            <Button
+              variant="contained"
+              onClick={performCrossover}
+              sx={{ borderRadius: 24, px: 4, bgcolor: "success.light" }}
+            >
+              Crossbreed Selected
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setSelectedNodes([])}
+              sx={{
+                borderRadius: 24,
+                borderColor: "divider",
+                color: "text.secondary",
               }}
             >
-              {generatedStory}
-            </Typography>
-          ) : (
-            <Typography color="text.secondary" align="center">
-              {storyElements 
-                ? 'Select story elements from the circle to build your story'
-                : 'Generate elements to start building your story'}
-            </Typography>
-          )}
-        </Paper>
+              Clear
+            </Button>
+          </Box>
+        )}
       </Box>
-    </Container>
+    </Box>
   );
 }
